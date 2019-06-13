@@ -6,53 +6,32 @@
 class Semaphore {
 public:
 
-    Semaphore(int threads):
-        capacity_(threads) {
+    Semaphore(int value):
+        val_(value) {
     }
 
-    virtual ~Semaphore() {
-        release();
-    }
-    
-    void release(){
-        std::unique_lock<std::mutex> lock(mutex_);
-        if (waiting_threads_ == 0) {
-            return;
+    void post() {
+        std::unique_lock<std::mutex> lck(mtx_);
+        if (++val_ <= 0) {
+            cvar_.notify_one();
         }
-
-        releasing_threads_ = true;
-        cvar_.notify_all();
-        cvar_.wait(lock, [&] { return !releasing_threads_; });
     }
 
     void wait() {
-        // Wait if threads from last round are still being released
-        std::unique_lock<std::mutex> lock(mutex_);
-        cvar_.wait(lock, [&] { return !releasing_threads_; });
-
-        // Wait until all threads are waiting
-        if (++waiting_threads_ < capacity_) {
-            cvar_.wait(lock, [&] { return releasing_threads_; });
-
-        } else {
-            release();
+        std::unique_lock<std::mutex> lck(mtx_);
+        if (--val_ < 0) {
+            cvar_.wait(lck);
         }
-
-        // Wake up sleeping threads
-        releasing_threads_ = --waiting_threads_;
-        cvar_.notify_all();
     }
 
 
 private:
 
-    bool releasing_threads_ = false;
-    int waiting_threads_ = 0;
-    int capacity_;
+    int val_;
     std::condition_variable cvar_;
-    std::mutex mutex_;       
+    std::mutex mtx_;
 
-};  // class Barrier
+};  // class Semaphore
 
 
 int sem_destroy(sem_t* sem) {
@@ -67,7 +46,7 @@ int sem_init(sem_t* sem, int, unsigned int value) {
 }
 
 int sem_post(sem_t* sem) {
-    static_cast<Semaphore*>(*sem)->release();
+    static_cast<Semaphore*>(*sem)->post();
     return 0;
 }
 
