@@ -132,6 +132,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="threads.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="threads.h" />
