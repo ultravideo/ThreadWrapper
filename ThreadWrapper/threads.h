@@ -1,18 +1,18 @@
 #pragma once
 
-#ifndef __cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
-using pthread_cond_t = void*;
-using pthread_mutex_t = void*;
-using pthread_t = void*;
-using voidp_voidp_func = void*(*)(void*);
+typedef void* pthread_cond_t;
+typedef void* pthread_cond_t;
+typedef void* pthread_mutex_t;
+typedef void* pthread_t;
+typedef void*(voidp_voidp_func)(void*);
 
-using placeholder = void;
-using pthread_attr_t = placeholder;
-using pthread_condattr_t = placeholder;
-using pthread_mutexattr_t = placeholder;
+typedef void pthread_attr_t;
+typedef void pthread_condattr_t;
+typedef void pthread_mutexattr_t;
 
 // Parameter names that have been commented away do nothing,
 // as they are always null when the functions are used in Kvazaar.
@@ -32,6 +32,6 @@ int pthread_mutex_init(pthread_mutex_t* mutex, const pthread_mutexattr_t* /*attr
 int pthread_mutex_lock(pthread_mutex_t* mutex);
 int pthread_mutex_unlock(pthread_mutex_t* mutex);
 
-#ifndef __cplusplus
+#ifdef __cplusplus
 }
 #endif
