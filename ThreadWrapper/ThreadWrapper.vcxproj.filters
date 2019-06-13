@@ -15,21 +15,21 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
+    <ClCompile Include="src\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="pthread.cpp">
+    <ClCompile Include="src\pthread.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="semaphore.cpp">
+    <ClCompile Include="src\semaphore.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="pthread.h">
+    <ClInclude Include="include\pthread.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="semaphore.h">
+    <ClInclude Include="include\semaphore.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
