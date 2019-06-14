@@ -26,8 +26,10 @@ int pthread_cond_signal(pthread_cond_t* cond) {
 }
 
 int pthread_cond_wait(pthread_cond_t* cond, pthread_mutex_t* mutex) {
-    std::unique_lock<std::mutex> lock(*static_cast<std::mutex*>(*mutex));
+    std::mutex* real_mutex = static_cast<std::mutex*>(*mutex);
+    std::unique_lock<std::mutex> lock(*real_mutex, std::adopt_lock);
     static_cast<std::condition_variable*>(*cond)->wait(lock);
+    lock.release();
     return 0;
 }
 
