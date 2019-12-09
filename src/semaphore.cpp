@@ -52,7 +52,6 @@ private:
 
 int sem_destroy(sem_t* sem) {
     delete static_cast<Semaphore*>(*sem);
-    *sem = nullptr;
     return 0;
 }
 

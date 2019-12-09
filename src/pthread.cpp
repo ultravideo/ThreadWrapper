@@ -25,25 +25,61 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 static std::unordered_map<std::thread::id, std::thread*> threads_;
 
-typedef struct {
+struct rw_lock_internal {
     std::shared_mutex* lock;
     bool write_lock;
-} rw_lock_internal;
+};
 
 
-int pthread_cond_broadcast(pthread_cond_t* cond) {
-    static_cast<std::condition_variable*>(*cond)->notify_all();
+int pthread_create(pthread_t* thread, const pthread_attr_t*, voidp_voidp_func fun, void* arg) {
+    // The execution of the thread must be postponed until the thread has been
+    // cached into threads_ in case it is needed in the threaded function.
+    std::atomic_bool thr_cached = false;
+    auto cache_then_exec_thread = [&, fun, arg] {
+        while (!thr_cached) {}
+        fun(arg);
+    };
+
+    std::thread* new_thread = new std::thread(cache_then_exec_thread);
+    threads_[new_thread->get_id()] = new_thread;
+    *thread = new_thread;
+    thr_cached = true;
     return 0;
 }
 
-int pthread_cond_destroy(pthread_cond_t* cond) {
-    delete static_cast<std::condition_variable*>(*cond);
-    *cond = nullptr;
+void pthread_exit(void*) {
+    // It might be enough to do nothing here
+    // considering Kvazaar's current use of pthread_exit.
+}
+
+pthread_t pthread_self() {
+    const auto it = threads_.find(std::this_thread::get_id());
+    if (it != threads_.cend()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
+int pthread_join(pthread_t thread, void**) {
+    std::thread* real_thread = static_cast<std::thread*>(thread);
+    real_thread->join();
+    threads_.erase(real_thread->get_id());
+    delete real_thread;
     return 0;
 }
 
 int pthread_cond_init(pthread_cond_t* cond, const pthread_condattr_t*) {
     *cond = new std::condition_variable();
+    return 0;
+}
+
+int pthread_cond_destroy(pthread_cond_t* cond) {
+    delete static_cast<std::condition_variable*>(*cond);
+    return 0;
+}
+
+int pthread_cond_broadcast(pthread_cond_t* cond) {
+    static_cast<std::condition_variable*>(*cond)->notify_all();
     return 0;
 }
 
@@ -60,51 +96,13 @@ int pthread_cond_wait(pthread_cond_t* cond, pthread_mutex_t* mutex) {
     return 0;
 }
 
-int pthread_create(pthread_t* thread, const pthread_attr_t*, voidp_voidp_func executee, void* arg) {
-    // The execution of the thread must be postponed until the thread has been
-    // cached into threads_ in case it is needed in the threaded function.
-    std::atomic_bool thr_cached = false;
-    auto cache_then_exec_thread = [&, executee, arg] {
-        while (!thr_cached) {}
-        executee(arg);
-    };
-
-    std::thread* new_thread = new std::thread(cache_then_exec_thread);
-    threads_[new_thread->get_id()] = new_thread;
-    *thread = new_thread;
-    thr_cached = true;
+int pthread_mutex_init(pthread_mutex_t* mutex, const pthread_mutexattr_t*) {
+    *mutex = new std::mutex();
     return 0;
-}
-
-void pthread_exit(void*) {
-    // It might be enough to do nothing here
-    // considering Kvazaar's current use of pthread_exit
-}
-
-int pthread_join(pthread_t thread, void**) {
-    std::thread* real_thread = static_cast<std::thread*>(thread);
-    real_thread->join();
-    threads_.erase(real_thread->get_id());
-    delete real_thread;
-    return 0;
-}
-
-pthread_t pthread_self() {
-    auto it = threads_.find(std::this_thread::get_id());
-    if (it != threads_.end()) {
-        return it->second;
-    }
-    return nullptr;
 }
 
 int pthread_mutex_destroy(pthread_mutex_t* mutex) {
     delete static_cast<std::mutex*>(*mutex);
-    *mutex = nullptr;
-    return 0;
-}
-
-int pthread_mutex_init(pthread_mutex_t* mutex, const pthread_mutexattr_t*) {
-    *mutex = new std::mutex();
     return 0;
 }
 
@@ -118,9 +116,8 @@ int pthread_mutex_unlock(pthread_mutex_t* mutex) {
     return 0;
 }
 
-int pthread_rwlock_init(pthread_rwlock_t* lock, const pthread_rwlockattr_t*)
-{
-    *lock = new rw_lock_internal;
+int pthread_rwlock_init(pthread_rwlock_t* lock, const pthread_rwlockattr_t*) {
+    *lock = new rw_lock_internal();
     static_cast<rw_lock_internal*>(*lock)->lock = new std::shared_mutex();
     static_cast<rw_lock_internal*>(*lock)->write_lock = false;
     return 0;
@@ -147,8 +144,7 @@ int pthread_rwlock_unlock(pthread_rwlock_t* rwlock) {
     if (static_cast<rw_lock_internal*>(*rwlock)->write_lock) {
         static_cast<rw_lock_internal*>(*rwlock)->write_lock = false;
         static_cast<rw_lock_internal*>(*rwlock)->lock->unlock();
-    }
-    else {
+    } else {
         static_cast<rw_lock_internal*>(*rwlock)->lock->unlock_shared();
     }
     return 0;
