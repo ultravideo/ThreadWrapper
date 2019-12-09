@@ -44,6 +44,7 @@ int pthread_cond_wait(pthread_cond_t* cond, pthread_mutex_t* mutex);
 int pthread_create(pthread_t* thread, const pthread_attr_t* /*attr*/, voidp_voidp_func executee, void* arg);
 void pthread_exit(void* /*value_ptr*/);
 int pthread_join(pthread_t thread, void** /*value_ptr*/);
+pthread_t pthread_self();
 
 int pthread_mutex_destroy(pthread_mutex_t* mutex);
 int pthread_mutex_init(pthread_mutex_t* mutex, const pthread_mutexattr_t* /*attr*/);

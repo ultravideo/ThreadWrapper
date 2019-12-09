@@ -15,16 +15,21 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
 #include "pthread.h"
+#include <atomic>
 #include <condition_variable>
 #include <mutex>
 #include <shared_mutex>
 #include <thread>
+#include <unordered_map>
 
+
+static std::unordered_map<std::thread::id, std::thread*> threads_;
 
 typedef struct {
     std::shared_mutex* lock;
     bool write_lock;
 } rw_lock_internal;
+
 
 int pthread_cond_broadcast(pthread_cond_t* cond) {
     static_cast<std::condition_variable*>(*cond)->notify_all();
@@ -56,7 +61,18 @@ int pthread_cond_wait(pthread_cond_t* cond, pthread_mutex_t* mutex) {
 }
 
 int pthread_create(pthread_t* thread, const pthread_attr_t*, voidp_voidp_func executee, void* arg) {
-    *thread = new std::thread(executee, arg);
+    // The execution of the thread must be postponed until the thread has been
+    // cached into threads_ in case it is needed in the threaded function.
+    std::atomic_bool thr_cached = false;
+    auto cache_then_exec_thread = [&, executee, arg] {
+        while (!thr_cached) {}
+        executee(arg);
+    };
+
+    std::thread* new_thread = new std::thread(cache_then_exec_thread);
+    threads_[new_thread->get_id()] = new_thread;
+    *thread = new_thread;
+    thr_cached = true;
     return 0;
 }
 
@@ -68,8 +84,17 @@ void pthread_exit(void*) {
 int pthread_join(pthread_t thread, void**) {
     std::thread* real_thread = static_cast<std::thread*>(thread);
     real_thread->join();
+    threads_.erase(real_thread->get_id());
     delete real_thread;
     return 0;
+}
+
+pthread_t pthread_self() {
+    auto it = threads_.find(std::this_thread::get_id());
+    if (it != threads_.end()) {
+        return it->second;
+    }
+    return nullptr;
 }
 
 int pthread_mutex_destroy(pthread_mutex_t* mutex) {
