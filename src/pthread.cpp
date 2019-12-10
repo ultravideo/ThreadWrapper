@@ -20,16 +20,14 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <shared_mutex>
 #include <thread>
 #include <unordered_map>
-#include <vector>
 
 
 static thread_local std::thread* this_thread = nullptr;
 
 static int next_key_ = 0;
-static std::vector<pthread_key_t> keys_;
-static std::shared_mutex key_mtx_;
-
-thread_local std::unordered_map<pthread_key_t, void*> data_;
+static std::unordered_map<pthread_key_t, void_voidp_func> dtors_;
+static std::shared_mutex dtor_mtx_;
+static thread_local std::unordered_map<pthread_key_t, void*> specifics_;
 
 struct rw_lock_internal {
     std::shared_mutex* lock;
@@ -42,6 +40,15 @@ int pthread_create(pthread_t* thread, const pthread_attr_t*, voidp_voidp_func fu
     *thread = new (new_thread) std::thread([&, fun, arg] {
         this_thread = new_thread;
         fun(arg);
+        for (auto& specific : specifics_) {
+            std::shared_lock<std::shared_mutex> lock(dtor_mtx_);
+            void* value = specific.second;
+            void_voidp_func dtor = dtors_.at(specific.first);
+            if (value != nullptr && dtor != nullptr) {
+                specific.second = nullptr;
+                dtor(value);
+            }
+        }
     });
     return 0;
 }
@@ -62,25 +69,24 @@ int pthread_join(pthread_t thread, void**) {
 }
 
 int pthread_key_create(pthread_key_t* key, void_voidp_func dtor) {
-    // The pthread_key_create() function performs no implicit synchronization.
-    // It is the responsibility of the programmer to ensure that it is called
-    // exactly once per key before use of the key.      POISTA KUN KAIKKI OK
-    std::lock_guard<std::shared_mutex> lock(key_mtx_);
+    std::unique_lock<std::shared_mutex> lock(dtor_mtx_);
     *key = reinterpret_cast<void*>(next_key_++);
-    keys_.push_back(*key);
+    dtors_[*key] = dtor;
     return 0;
 }
 
 int pthread_key_delete(pthread_key_t key) {
-
+    std::unique_lock<std::shared_mutex> lock(dtor_mtx_);
+    dtors_.erase(key);
     return 0;
 }
 
 void* pthread_getspecific(pthread_key_t key) {
-    return nullptr;
+    return specifics_[key];
 }
 
 int pthread_setspecific(pthread_key_t key, const void* value) {
+    specifics_[key] = const_cast<void*>(value);
     return 0;
 }
 

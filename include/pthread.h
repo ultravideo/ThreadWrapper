@@ -30,8 +30,8 @@ typedef void* pthread_mutex_t;
 typedef void pthread_mutexattr_t;
 typedef void* pthread_rwlock_t;
 typedef void pthread_rwlockattr_t;
-typedef void*(voidp_voidp_func)(void*);
-typedef void(void_voidp_func)(void*);
+typedef void*(*voidp_voidp_func)(void*);
+typedef void(*void_voidp_func)(void*);
 
 // Parameters whose names have been commented away have not been implemented,
 // as Kvazaar has no use for them.
