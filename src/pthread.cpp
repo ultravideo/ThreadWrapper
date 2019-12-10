@@ -15,15 +15,21 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
 #include "pthread.h"
-#include <atomic>
 #include <condition_variable>
 #include <mutex>
 #include <shared_mutex>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 
-static std::unordered_map<std::thread::id, std::thread*> threads_;
+static thread_local std::thread* this_thread = nullptr;
+
+static int next_key_ = 0;
+static std::vector<pthread_key_t> keys_;
+static std::shared_mutex key_mtx_;
+
+thread_local std::unordered_map<pthread_key_t, void*> data_;
 
 struct rw_lock_internal {
     std::shared_mutex* lock;
@@ -32,18 +38,11 @@ struct rw_lock_internal {
 
 
 int pthread_create(pthread_t* thread, const pthread_attr_t*, voidp_voidp_func fun, void* arg) {
-    // The execution of the thread must be postponed until the thread has been
-    // cached into threads_ in case it is needed in the threaded function.
-    std::atomic_bool thr_cached = false;
-    auto cache_then_exec_thread = [&, fun, arg] {
-        while (!thr_cached) {}
+    std::thread* new_thread = new std::thread();
+    *thread = new (new_thread) std::thread([&, fun, arg] {
+        this_thread = new_thread;
         fun(arg);
-    };
-
-    std::thread* new_thread = new std::thread(cache_then_exec_thread);
-    threads_[new_thread->get_id()] = new_thread;
-    *thread = new_thread;
-    thr_cached = true;
+    });
     return 0;
 }
 
@@ -53,18 +52,35 @@ void pthread_exit(void*) {
 }
 
 pthread_t pthread_self() {
-    const auto it = threads_.find(std::this_thread::get_id());
-    if (it != threads_.cend()) {
-        return it->second;
-    }
-    return nullptr;
+    return this_thread;
 }
 
 int pthread_join(pthread_t thread, void**) {
-    std::thread* real_thread = static_cast<std::thread*>(thread);
-    real_thread->join();
-    threads_.erase(real_thread->get_id());
-    delete real_thread;
+    static_cast<std::thread*>(thread)->join();
+    delete static_cast<std::thread*>(thread);
+    return 0;
+}
+
+int pthread_key_create(pthread_key_t* key, void_voidp_func dtor) {
+    // The pthread_key_create() function performs no implicit synchronization.
+    // It is the responsibility of the programmer to ensure that it is called
+    // exactly once per key before use of the key.      POISTA KUN KAIKKI OK
+    std::lock_guard<std::shared_mutex> lock(key_mtx_);
+    *key = reinterpret_cast<void*>(next_key_++);
+    keys_.push_back(*key);
+    return 0;
+}
+
+int pthread_key_delete(pthread_key_t key) {
+
+    return 0;
+}
+
+void* pthread_getspecific(pthread_key_t key) {
+    return nullptr;
+}
+
+int pthread_setspecific(pthread_key_t key, const void* value) {
     return 0;
 }
 

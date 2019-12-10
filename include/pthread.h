@@ -25,6 +25,7 @@ typedef void* pthread_t;
 typedef void pthread_attr_t;
 typedef void* pthread_cond_t;
 typedef void pthread_condattr_t;
+typedef void* pthread_key_t;
 typedef void* pthread_mutex_t;
 typedef void pthread_mutexattr_t;
 typedef void* pthread_rwlock_t;
@@ -40,6 +41,11 @@ int pthread_create(pthread_t* thread, const pthread_attr_t* /*attr*/, voidp_void
 void pthread_exit(void* /*retval*/);
 pthread_t pthread_self();
 int pthread_join(pthread_t thread, void** /*retval*/);
+
+int pthread_key_create(pthread_key_t* key, void_voidp_func dtor);
+int pthread_key_delete(pthread_key_t key);
+void* pthread_getspecific(pthread_key_t key);
+int pthread_setspecific(pthread_key_t key, const void* value);
 
 int pthread_cond_init(pthread_cond_t* cond, const pthread_condattr_t* /*attr*/);
 int pthread_cond_destroy(pthread_cond_t* cond);
