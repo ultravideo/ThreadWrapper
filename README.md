@@ -28,3 +28,7 @@ Implemented functions:
 - pthread_rwlock_rdlock
 - pthread_rwlock_wrlock
 - pthread_rwlock_unlock
+- sem_init
+- sem_destroy
+- sem_post
+- sem_wait
